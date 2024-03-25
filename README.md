@@ -26,13 +26,8 @@ You have to add these configuration parameters to config.php:
 
 ```
 $config['enable_proxmox']      = 1;  # Enable Proxmox VM support
-$config['proxmox_username']    = 'observium';
-$config['proxmox_password']    = 'mysecret';
-$config['proxmox_realm']       = 'pve';
-$config['proxmox_token_name']  = 'mytoken';
-$config['proxmox_token_value'] = '27801b8a-7227-4e2e-900d-1a62e01ccfac';
 ```
-The hostname for API login will be the hostname of the Observium configured device.
+The hostname for API login will be the hostname of the Observium configured device. After adding a Proxmox VE node, you can edit API login parameters in device propertiers, **VM discovery**.
 
 Parameter **proxmox_password** is optional if you intend to use API tokens, otherwise **proxmox_token_name** and **proxmox_token_value** are optional if you intend to user username and password. We recommens to use tokens, so you can avoid to flood syslog of Proxmox VE nodes of authentications. 
 
