@@ -1,6 +1,131 @@
+diff -urN a/observium/html/pages/device/edit/vms.inc.php b/observium/html/pages/device/edit/vms.inc.php
+--- a/observium/html/pages/device/edit/vms.inc.php	1970-01-01 01:00:00.000000000 +0100
++++ b/observium/html/pages/device/edit/vms.inc.php	2024-03-25 13:07:19.363794786 +0100
+@@ -0,0 +1,107 @@
++<?php
++
++/**
++ * Observium Network Management and Monitoring System
++ * Copyright (C) 2006-2015, Adam Armstrong - http://www.observium.org
++ *
++ * @package    observium
++ * @subpackage webui
++ * @author     Adam Armstrong <adama@observium.org>
++ * @copyright  (C) 2006-2013 Adam Armstrong, (C) 2013-2019 Observium Limited
++ *
++ */
++
++if ($vars['editing'])
++{
++  if ($readonly)
++  {
++    print_error_permission('You have insufficient permissions to edit settings.');
++  } else {
++    if ($vars['proxmox_username']  != '')  { set_dev_attrib($device, 'proxmox_username' , $vars['proxmox_username']);  } else { del_dev_attrib($device, 'proxmox_username'); }
++    if ($vars['proxmox_password']  != '')  { set_dev_attrib($device, 'proxmox_password' , $vars['proxmox_password']);  } else { del_dev_attrib($device, 'proxmox_password'); }
++    if ($vars['proxmox_realm']  != '')  { set_dev_attrib($device, 'proxmox_realm' , $vars['proxmox_realm']);  } else { del_dev_attrib($device, 'proxmox_realm'); }
++    if ($vars['proxmox_token_name']  != '')  { set_dev_attrib($device, 'proxmox_token_name' , $vars['proxmox_token_name']);  } else { del_dev_attrib($device, 'proxmox_token_name'); }
++    if ($vars['proxmox_token_value']  != '')  { set_dev_attrib($device, 'proxmox_token_value' , $vars['proxmox_token_value']);  } else { del_dev_attrib($device, 'proxmox_token_value'); }
++    $update_message = "Device VM discovery configuration updated.";
++    $updated = 1;
++  }
++  if ($updated && $update_message)
++  {
++    print_message($update_message);
++  }
++  else if ($update_message)
++  {
++    print_error($update_message);
++  }
++}
++
++$device = dbFetchRow("SELECT * FROM `devices` WHERE `device_id` = ?", array($device['device_id']));
++
++    $form = array('type'      => 'horizontal',
++                  'id'        => 'edit',
++                  'title'     => 'VM discovery',
++                  );
++
++    $form['fieldset']['edit'] = [
++        'div'   => 'top',
++        'title' => 'Proxmox Configuration',
++        'class' => 'col-md-6'
++    ];
++
++    $form['fieldset']['submit'] = [
++        'div'   => 'bottom',
++        'style' => 'padding: 0px;',
++        'class' => 'col-md-12'
++    ];
++
++    $form['row'][0]['editing'] = array(
++                                'type'        => 'hidden',
++                                'value'       => 'yes');
++    $form['row'][1]['proxmox_username'] = array(
++                                'type'        => 'text',
++                                'fieldset'    => 'edit',
++                                'name'        => 'Proxmox Username',
++                                'width'       => '250px',
++                                'readonly'    => $readonly,
++                                'value'       => get_dev_attrib($device, 'proxmox_username'));
++    $form['row'][2]['proxmox_password'] = array(
++                                'type'        => 'password',
++                                'fieldset'    => 'edit',
++                                'name'        => 'Proxmox Password',
++                                'width'       => '250px',
++                                'readonly'    => $readonly,
++                                'value'       => get_dev_attrib($device, 'proxmox_password'));
++    $form['row'][3]['proxmox_realm'] = array(
++                                'type'        => 'text',
++                                'fieldset'    => 'edit',
++                                'name'        => 'Proxmox Realm',
++                                'width'       => '250px',
++                                'readonly'    => $readonly,
++                                'value'       => get_dev_attrib($device, 'proxmox_realm'));
++    $form['row'][4]['proxmox_token_name'] = array(
++                                'type'        => 'text',
++                                'fieldset'    => 'edit',
++                                'name'        => 'Proxmox Token name',
++                                'width'       => '250px',
++                                'readonly'    => $readonly,
++                                'value'       => get_dev_attrib($device, 'proxmox_token_name'));
++    $form['row'][5]['proxmox_token_value'] = array(
++                                'type'        => 'password',
++                                'fieldset'    => 'edit',
++                                'name'        => 'Proxmox Token value',
++                                'width'       => '250px',
++                                'readonly'    => $readonly,
++                                'value'       => get_dev_attrib($device, 'proxmox_token_value'));
++    $form['row'][6]['submit'] = array(
++                              'type'        => 'submit',
++                              'fieldset'    => 'submit',
++                              'name'        => 'Save Changes',
++                              'icon'        => 'icon-ok icon-white',
++                              'class'       => 'btn-primary',
++                              'readonly'    => $readonly,
++                              'value'       => 'save');
++
++    print_form($form);
++    unset($form);
++
++// EOF
+diff -urN a/observium/html/pages/device/edit.inc.php b/observium/html/pages/device/edit.inc.php
+--- a/observium/html/pages/device/edit.inc.php	2023-01-13 13:41:24.000000000 +0100
++++ b/observium/html/pages/device/edit.inc.php	2024-03-25 12:54:19.410243479 +0100
+@@ -67,6 +67,10 @@
+       $device['os_group'] === 'unix' || is_module_enabled($device, 'unix-agent', 'poller')) { // unix-agent
+     $panes['ssh']    = 'SSH';
+   }
++  if (($config['enable_proxmox'] && $device['os'] === 'linux') ||                             // proxmox discovery module
++      $device['os_group'] === 'unix') {
++    $panes['vms']    = 'VM discovery';
++  }
+   if ($device['os_group'] === 'unix' || $device['os'] === 'generic') {
+     $panes['agent']  = 'Agent';
+   }
 diff -urN a/observium/includes/discovery/storage/proxmox.inc.php b/observium/includes/discovery/storage/proxmox.inc.php
 --- a/observium/includes/discovery/storage/proxmox.inc.php	1970-01-01 01:00:00.000000000 +0100
-+++ b/observium/includes/discovery/storage/proxmox.inc.php	2023-03-18 15:02:32.616176761 +0100
++++ b/observium/includes/discovery/storage/proxmox.inc.php	2024-03-25 15:26:56.291124968 +0100
 @@ -0,0 +1,39 @@
 +<?php
 +
@@ -15,11 +140,11 @@ diff -urN a/observium/includes/discovery/storage/proxmox.inc.php b/observium/inc
 +
 +    $configure = [
 +        'hostname' => $device['hostname'],
-+        'username' => $config['proxmox_username'],
-+        'password' => $config['proxmox_password'] ?? null,
-+        'realm' => $config['proxmox_realm'],
-+        'token_name' => $config['proxmox_token_name'] ?? null,
-+        'token_value' => $config['proxmox_token_value'] ?? null,
++        'username' => get_dev_attrib($device,'proxmox_username'),
++        'password' => get_dev_attrib($device,'proxmox_password'),
++        'realm' => get_dev_attrib($device,'proxmox_realm'),
++        'token_name' => get_dev_attrib($device,'proxmox_token_name'),
++        'token_value' => get_dev_attrib($device,'proxmox_token_value'),
 +    ];
 +    Request::Login($configure);
 +
@@ -42,8 +167,8 @@ diff -urN a/observium/includes/discovery/storage/proxmox.inc.php b/observium/inc
 +
 +}
 diff -urN a/observium/includes/discovery/storage.inc.php b/observium/includes/discovery/storage.inc.php
---- a/observium/includes/discovery/storage.inc.php	2023-03-18 15:32:48.636345496 +0100
-+++ b/observium/includes/discovery/storage.inc.php	2023-03-17 16:20:05.789602910 +0100
+--- a/observium/includes/discovery/storage.inc.php	2023-03-18 15:32:48.000000000 +0100
++++ b/observium/includes/discovery/storage.inc.php	2023-03-17 16:20:05.000000000 +0100
 @@ -10,6 +10,9 @@
   *
   */
@@ -56,7 +181,7 @@ diff -urN a/observium/includes/discovery/storage.inc.php b/observium/includes/di
  $include_dir = "includes/discovery/storage";
 diff -urN a/observium/includes/discovery/virtual-machines/proxmox.inc.php b/observium/includes/discovery/virtual-machines/proxmox.inc.php
 --- a/observium/includes/discovery/virtual-machines/proxmox.inc.php	1970-01-01 01:00:00.000000000 +0100
-+++ b/observium/includes/discovery/virtual-machines/proxmox.inc.php	2023-03-18 15:02:17.094675653 +0100
++++ b/observium/includes/discovery/virtual-machines/proxmox.inc.php	2024-03-25 15:44:57.828203670 +0100
 @@ -0,0 +1,39 @@
 +<?php
 +
@@ -67,15 +192,15 @@ diff -urN a/observium/includes/discovery/virtual-machines/proxmox.inc.php b/obse
 +
 +if ($config['enable_proxmox'] == '1' && $device['os'] == "pve")
 +{
-+  echo("Proxmox VM: ");
++    echo("Proxmox VM: ");
 +
 +    $configure = [
 +        'hostname' => $device['hostname'],
-+        'username' => $config['proxmox_username'],
-+        'password' => $config['proxmox_password'] ?? null,
-+        'realm' => $config['proxmox_realm'],
-+        'token_name' => $config['proxmox_token_name'] ?? null,
-+        'token_value' => $config['proxmox_token_value'] ?? null,
++        'username' => get_dev_attrib($device,'proxmox_username'),
++        'password' => get_dev_attrib($device,'proxmox_password'),
++        'realm' => get_dev_attrib($device,'proxmox_realm'),
++        'token_name' => get_dev_attrib($device,'proxmox_token_name'),
++        'token_value' => get_dev_attrib($device,'proxmox_token_value'),
 +    ];
 +    Request::Login($configure);
 +
@@ -98,8 +223,8 @@ diff -urN a/observium/includes/discovery/virtual-machines/proxmox.inc.php b/obse
 +
 +// EOF
 diff -urN a/observium/includes/discovery/virtual-machines.inc.php b/observium/includes/discovery/virtual-machines.inc.php
---- a/observium/includes/discovery/virtual-machines.inc.php	2023-03-17 14:37:45.955363755 +0100
-+++ b/observium/includes/discovery/virtual-machines.inc.php	2023-03-17 16:07:52.508484655 +0100
+--- a/observium/includes/discovery/virtual-machines.inc.php	2023-03-17 14:37:45.000000000 +0100
++++ b/observium/includes/discovery/virtual-machines.inc.php	2023-03-17 16:07:52.000000000 +0100
 @@ -14,6 +14,8 @@
  
  // Always run libvirt (module checks for os suitability and enable_libvirt)
@@ -111,7 +236,7 @@ diff -urN a/observium/includes/discovery/virtual-machines.inc.php b/observium/in
  $include_dir = "includes/discovery/virtual-machines";
 diff -urN a/observium/includes/polling/storage/proxmox.inc.php b/observium/includes/polling/storage/proxmox.inc.php
 --- a/observium/includes/polling/storage/proxmox.inc.php	1970-01-01 01:00:00.000000000 +0100
-+++ b/observium/includes/polling/storage/proxmox.inc.php	2023-03-18 15:02:45.586745951 +0100
++++ b/observium/includes/polling/storage/proxmox.inc.php	2024-03-25 15:27:45.111711052 +0100
 @@ -0,0 +1,36 @@
 +<?php
 +
@@ -124,11 +249,11 @@ diff -urN a/observium/includes/polling/storage/proxmox.inc.php b/observium/inclu
 +{
 +    $configure = [
 +        'hostname' => $device['hostname'],
-+        'username' => $config['proxmox_username'],
-+        'password' => $config['proxmox_password'] ?? null,
-+        'realm' => $config['proxmox_realm'],
-+        'token_name' => $config['proxmox_token_name'] ?? null,
-+        'token_value' => $config['proxmox_token_value'] ?? null,
++        'username' => get_dev_attrib($device,'proxmox_username'),
++        'password' => get_dev_attrib($device,'proxmox_password'),
++        'realm' => get_dev_attrib($device,'proxmox_realm'),
++        'token_name' => get_dev_attrib($device,'proxmox_token_name'),
++        'token_value' => get_dev_attrib($device,'proxmox_token_value'),
 +    ];
 +    Request::Login($configure);
 +    $nodes = Request::Request('/nodes', null, 'GET');
