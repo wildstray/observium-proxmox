@@ -1,3 +1,51 @@
+diff -urN a/observium/html/includes/entities/virtualmachine.inc.php b/observium/html/includes/entities/virtualmachine.inc.php
+--- a/observium/html/includes/entities/virtualmachine.inc.php	2022-12-30 11:53:41.000000000 +0100
++++ b/observium/html/includes/entities/virtualmachine.inc.php	2024-03-27 21:35:56.623947595 +0100
+@@ -45,6 +45,9 @@
+       case "cpu":
+         $sql .= generate_query_values_and($value, 'vm_cpucount');
+         break;
++      case "type":
++        $sql .= generate_query_values_and($value, 'vm_type');
++        break;
+     }
+   }
+   $sql .= $GLOBALS['cache']['where']['devices_permitted'];
+@@ -65,6 +68,7 @@
+     'os'     => array('Operating System'),
+     'memory' => array('Memory'),
+     'cpu'    => array('CPU'),
++    'type'    => array('Type'),
+   );
+ 
+   if ($vars['page'] == "device" || $vars['popup'] == TRUE )
+@@ -123,6 +127,9 @@
+     case 'cpu':
+       $vms = array_sort_by($vms, 'vm_cpucount', $sort_order, SORT_NUMERIC);
+       break;
++    case 'type':
++      $vms = array_sort_by($vms, 'vm_type', $sort_order, SORT_STRING);
++      break;
+     default:
+       // Not sorted
+   }
+@@ -164,7 +171,7 @@
+ {
+   global $config;
+ 
+-  $table_cols = "8";
++  $table_cols = "9";
+ 
+   $out =  '<tr class="' . $vm['row_class'] . '">'; // <td class="state-marker"></td>'; // FIXME useful when we start polling VM state
+   if ($vars['page'] != "device" && $vars['popup'] != TRUE )
+@@ -198,6 +205,7 @@
+ 
+   $out .= '<td>'. format_bi($vm['vm_memory'] * 1024 * 1024, 3, 3) .'B</td>';
+   $out .= '<td>'. $vm['vm_cpucount'] .'</td>';
++  $out .= '<td>'. $vm['vm_type'] .'</td>';
+   $out .= '</tr>';
+ 
+   return $out;
 diff -urN a/observium/html/pages/device/edit/vms.inc.php b/observium/html/pages/device/edit/vms.inc.php
 --- a/observium/html/pages/device/edit/vms.inc.php	1970-01-01 01:00:00.000000000 +0100
 +++ b/observium/html/pages/device/edit/vms.inc.php	2024-03-25 13:07:19.363794786 +0100
@@ -181,8 +229,8 @@ diff -urN a/observium/includes/discovery/storage.inc.php b/observium/includes/di
  $include_dir = "includes/discovery/storage";
 diff -urN a/observium/includes/discovery/virtual-machines/proxmox.inc.php b/observium/includes/discovery/virtual-machines/proxmox.inc.php
 --- a/observium/includes/discovery/virtual-machines/proxmox.inc.php	1970-01-01 01:00:00.000000000 +0100
-+++ b/observium/includes/discovery/virtual-machines/proxmox.inc.php	2024-03-25 15:44:57.828203670 +0100
-@@ -0,0 +1,39 @@
++++ b/observium/includes/discovery/virtual-machines/proxmox.inc.php	2024-03-27 21:40:11.167948462 +0100
+@@ -0,0 +1,75 @@
 +<?php
 +
 +// Try to discover Proxmox Virtual Machines.
@@ -204,14 +252,50 @@ diff -urN a/observium/includes/discovery/virtual-machines/proxmox.inc.php b/obse
 +    ];
 +    Request::Login($configure);
 +
++    $ostypes = [
++        "other" => "unspecified OS",
++        "wxp" => "Microsoft Windows XP",
++        "w2k" => "Microsoft Windows 2000",
++        "w2k3" => "Microsoft Windows 2003",
++        "w2k8" => "Microsoft Windows 2008",
++        "wvista" => "Microsoft Windows Vista",
++        "win7" => "Microsoft Windows 7",
++        "win8" => "Microsoft Windows 8/2012/2012r2",
++        "win10" => "Microsoft Windows 10/2016/2019",
++        "win11" => "Microsoft Windows 11/2022",
++        "l24" => "Linux 2.4 Kernel",
++        "l26" => "Linux 2.6 - 6.X Kernel",
++        "solaris" => "Solaris/OpenSolaris/OpenIndiania kernel"
++    ];
++
++    $vm_insert = array('device_id'   => $device['device_id'],
++                       'vm_type'     => $options['type'],
++                       'vm_uuid'     => $options['id'],
++                       'vm_name'     => $options['name'],
++                       'vm_guestos'  => $options['os'],
++                       'vm_memory'   => $options['memory'] / 1024 / 1024,
++                       'vm_cpucount' => $options['cpucount'],
++                       'vm_state'    => $options['status'],
++                       'vm_source'   => $options['source']);
++
 +    $nodes = Request::Request('/nodes', null, 'GET');
 +    foreach ($nodes->data as $node) {
 +        if ($device['hostname'] == $node->node) {
 +            $vms = Request::Request("/nodes/".$node->node."/qemu", null, 'GET');
 +            foreach ($vms->data as $vm) {
 +                echo $vm->name. " ";
-+                discover_virtual_machine($valid, $device, array('id' => $vm->vmid, 'name' => $vm->name, 'cpucount' => $vm->cpus,
-+                'memory' => $vm->maxmem, 'status' => $vm->status, 'type' => 'proxmox', 'source' => 'proxmox', 'protocol' => 'API'));
++                $vmconf = Request::Request("/nodes/".$node->node."/qemu/".$vm->vmid."/config", null, 'GET');
++                discover_virtual_machine($valid, $device, array('id' => $vmconf->data->vmgenid, 'name' => $vm->name, 'cpucount' => $vm->cpus,
++                'os' => $ostypes[$vmconf->data->ostype], 'memory' => $vm->maxmem, 'status' => $vm->status, 'type' => 'VM',
++                'source' => 'proxmox', 'protocol' => 'API'));
++            }
++            $lxs = Request::Request("/nodes/".$node->node."/lxc", null, 'GET');
++            foreach ($lxs->data as $lx) {
++                echo $lx->name. " ";
++                $lxconf = Request::Request("/nodes/".$node->node."/lxc/".$lx->vmid."/config", null, 'GET');
++                discover_virtual_machine($valid, $device, array('id' => $lx->vmid, 'name' => $lx->name, 'cpucount' => $lx->cpus,
++                'os' => $lxconf->data->ostype, 'memory' => $lx->maxmem, 'status' => $lx->status, 'type' => 'CT',
++                'source' => 'proxmox', 'protocol' => 'API'));
 +            }
 +        }
 +    }
